@@ -11,7 +11,7 @@ dotenv.config();
 
 app.use(cors(
   {
-   origin :"https://file-uploder-8ogjgfl7l-ipankaj99s-projects.vercel.app",
+   origin :"https://file-uploder-zeta.vercel.app",
        credentials: true
   }
 ));
