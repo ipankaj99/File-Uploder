@@ -4,15 +4,18 @@ import {v2 as cloudinary} from 'cloudinary';
 import multer from 'multer';
 import dotenv from 'dotenv';
 import streamifier from 'streamifier';
-dotenv.config();
 const app=express();
+dotenv.config();
+
+
 
 app.use(cors(
   {
- origin: "https://file-uploder-zeta.vercel.app", 
-  credentials: true
+   origin :"https://file-uploder-zeta.vercel.app/",
+       credentials: true
   }
 ));
+console.log(process.env.CLOUDINARY_NAME)
 
 cloudinary.config({
     cloud_name:process.env.CLOUDINARY_NAME,
@@ -86,4 +89,5 @@ app.post("/uploadMultiple", upload.array("file"), async (req, res) => {
 });
 app.listen(PORT, ()=>{
     console.log(`http://localhost:${PORT}`);
+    
 })
