@@ -24,12 +24,12 @@ function App() {
 
       {/* //Drop zone */}
        <div style={styles.card}>
-        <h2 style={styles.heading}>Multiple File Upload</h2>
+        <h2 style={styles.heading}>Single File Upload Using Drag And Drop </h2>
         <DropZone />
       </div>
 
       <div style={styles.card}>
-        <h2 style={styles.heading}>Multiple File Upload</h2>
+        <h2 style={styles.heading}>Multiple File Upload Using Drag And Drop</h2>
         <DropZoneM />
       </div>
 
