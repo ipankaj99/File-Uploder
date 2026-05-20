@@ -6,6 +6,11 @@ function FileUploadM() {
   const [error, setError] = useState([]);
   const [response, setResponse] = useState("");
 
+  setInterval(()=>{
+
+    
+  })
+
   const LIMIT = 5 * 1024 * 1024; // 5MB
   const allowedTypes = [
     "image/jpeg",
@@ -46,7 +51,7 @@ function FileUploadM() {
 
     setFile((prev) => [...prev, ...validFiles]);
     setError(errors);
-    setResponse('');
+    
   };
 
   // PREVIEW

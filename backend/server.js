@@ -7,7 +7,11 @@ import streamifier from 'streamifier';
 dotenv.config();
 const app=express();
 
-app.use(cors());
+app.use(cors(
+  {
+    origin:'*'
+  }
+));
 
 cloudinary.config({
     cloud_name:process.env.CLOUD_NAME,
@@ -21,6 +25,7 @@ const upload=multer({storage,
         fileSize: 5*1024*1024
     }
 })
+const PORT=process.env.PORT || 5000;
 
 
 app.post("/upload", upload.single("file"), async (req, res) => {
@@ -78,6 +83,6 @@ app.post("/uploadMultiple", upload.array("file"), async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-app.listen(5000, ()=>{
-    console.log("http://localhost:5000");
+app.listen(PORT, ()=>{
+    console.log(`http://localhost:${PORT}`);
 })
