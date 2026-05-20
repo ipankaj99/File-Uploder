@@ -1,13 +1,20 @@
 import React, { useState } from "react";
 import axios from "axios";
+import toast from "react-hot-toast";
+import { endpoints } from "../api";
+import UploadProgressPanel from "./UploadProgressPanel";
+import { isImageFile } from "../utils/fileDisplay";
 
 function FileUpload() {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
-  const [error, setError] = useState("");
+  const [pickError, setPickError] = useState("");
+  const [uploadError, setUploadError] = useState("");
   const [uploadedUrl, setUploadedUrl] = useState("");
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
 
-  const LIMIT = 5 * 1024 * 1024; // 5MB
+  const LIMIT = 5 * 1024 * 1024;
 
   const allowedTypes = [
     "image/jpeg",
@@ -18,22 +25,31 @@ function FileUpload() {
   const fileUpload = (e) => {
     const selectedFile = e.target.files[0];
 
-    setError("");
+    setPickError("");
+    setUploadError("");
     setUploadedUrl("");
+    setUploadProgress(0);
+    setIsUploading(false);
 
-    if (!selectedFile) return;
+    if (preview) {
+      URL.revokeObjectURL(preview);
+    }
 
-    // ✅ SIZE VALIDATION
-    if (selectedFile.size > LIMIT) {
-      setError("File size must be less than 5MB");
+    if (!selectedFile) {
       setFile(null);
       setPreview(null);
       return;
     }
 
-    // ✅ TYPE VALIDATION
+    if (selectedFile.size > LIMIT) {
+      setPickError("File size must be less than 5MB");
+      setFile(null);
+      setPreview(null);
+      return;
+    }
+
     if (!allowedTypes.includes(selectedFile.type)) {
-      setError("Only JPG, PNG, PDF allowed");
+      setPickError("Only JPG, PNG, PDF allowed");
       setFile(null);
       setPreview(null);
       return;
@@ -41,6 +57,7 @@ function FileUpload() {
 
     setFile(selectedFile);
     setPreview(URL.createObjectURL(selectedFile));
+    setUploadError("");
   };
 
   const handlePreview = () => {
@@ -49,130 +66,134 @@ function FileUpload() {
     }
   };
 
+  const clearSelection = () => {
+    if (preview) URL.revokeObjectURL(preview);
+    setFile(null);
+    setPreview(null);
+    setPickError("");
+    setUploadError("");
+    setUploadedUrl("");
+    setUploadProgress(0);
+    setIsUploading(false);
+  };
+
   const submitFile = async () => {
     try {
       if (!file) return;
 
+      setUploadError("");
+      setIsUploading(true);
+      setUploadProgress(0);
+
       const formData = new FormData();
       formData.append("file", file);
 
-      const res = await axios.post(
-        "https://file-uploder-64w8.onrender.com/upload",
-        formData
-      );
+      const res = await axios.post(endpoints.upload, formData, {
+        onUploadProgress: (progressEvent) => {
+          const total = progressEvent.total || 1;
+          const percent = Math.round((progressEvent.loaded * 100) / total);
+          setUploadProgress(percent);
+        },
+      });
 
       setUploadedUrl(res.data.url);
+      if (preview) URL.revokeObjectURL(preview);
       setFile(null);
       setPreview(null);
-    } catch (err) {
-      setError("Upload failed");
+      setUploadProgress(100);
+      setPickError("");
+      setUploadError("");
+      toast.success("File uploaded successfully");
+    } catch {
+      setUploadError("Upload failed");
+      setUploadProgress(0);
+      toast.error("Upload failed");
+    } finally {
+      setIsUploading(false);
     }
   };
 
+  const showPreview = file && preview && !isUploading;
+  const canRetry = Boolean(uploadError && file && !isUploading);
+
   return (
-    <div style={styles.container}>
-      <div style={styles.card}>
-        <h2>📁 File Upload</h2>
+    <div className="uploader">
+      <input
+        className="file-input"
+        type="file"
+        onChange={fileUpload}
+        disabled={isUploading}
+      />
+      <p className="helper-text">Allowed: JPG, PNG, PDF | Max size: 5MB</p>
 
-        {/* INPUT */}
-        <input type="file" onChange={fileUpload} />
+      {pickError && <p className="alert alert--error">{pickError}</p>}
+      {uploadError && <p className="alert alert--error">{uploadError}</p>}
 
-        {/* FILE NAME */}
-        {file && (
-          <p style={styles.fileName}>📄 {file.name}</p>
-        )}
+      {isUploading && (
+        <UploadProgressPanel
+          percent={uploadProgress}
+          label={`Uploading ${file?.name || "file"}...`}
+        />
+      )}
 
-        {/* ERROR */}
-        {error && <p style={styles.error}>{error}</p>}
+      {showPreview && (
+        <div className="preview-block">
+          {isImageFile(file) ? (
+            <img
+              className="preview-single"
+              src={preview}
+              alt={file.name}
+            />
+          ) : (
+            <div className="preview-single preview-single--doc">
+              <span className="preview-single__label">PDF</span>
+              <span className="muted">{file.name}</span>
+            </div>
+          )}
+          <div className="btn-row">
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={handlePreview}
+            >
+              Open
+            </button>
+            <button
+              type="button"
+              className="btn btn--danger"
+              onClick={clearSelection}
+            >
+              Remove
+            </button>
+          </div>
+        </div>
+      )}
 
-        {/* PREVIEW BUTTON */}
-        {preview && (
-          <button style={styles.previewBtn} onClick={handlePreview}>
-            👀 Preview
+      <div className="btn-row btn-row--wrap">
+        <button
+          className="btn btn--primary"
+          type="button"
+          onClick={submitFile}
+          disabled={!file || isUploading}
+        >
+          {isUploading ? "Uploading..." : "Upload"}
+        </button>
+        {canRetry && (
+          <button
+            type="button"
+            className="btn btn--ghost"
+            onClick={submitFile}
+          >
+            Retry
           </button>
         )}
-
-        {/* UPLOAD BUTTON */}
-        <button
-          style={{
-            ...styles.uploadBtn,
-            opacity: file ? 1 : 0.5,
-            cursor: file ? "pointer" : "not-allowed",
-          }}
-          onClick={submitFile}
-          disabled={!file}
-        >
-          ⬆ Upload
-        </button>
-
-        {/* SUCCESS */}
-        {uploadedUrl && (
-          <p style={styles.success}>
-            ✅ Uploaded Successfully
-          </p>
-        )}
       </div>
+
+      {uploadedUrl && !isUploading && (
+        <p className="alert alert--success">Uploaded successfully.</p>
+      )}
     </div>
   );
 }
-
-const styles = {
-  container: {
-    height: "100vh",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    background: "#f3f4f6",
-    fontFamily: "Arial",
-  },
-
-  card: {
-    width: "380px",
-    padding: "20px",
-    borderRadius: "12px",
-    background: "white",
-    boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
-    textAlign: "center",
-  },
-
-  fileName: {
-    marginTop: "10px",
-    fontSize: "14px",
-    color: "#333",
-  },
-
-  previewBtn: {
-    marginTop: "10px",
-    width: "100%",
-    padding: "10px",
-    background: "#3b82f6",
-    color: "white",
-    border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-  },
-
-  uploadBtn: {
-    marginTop: "10px",
-    width: "100%",
-    padding: "10px",
-    background: "#10b981",
-    color: "white",
-    border: "none",
-    borderRadius: "8px",
-  },
-
-  error: {
-    color: "red",
-    fontSize: "13px",
-    marginTop: "10px",
-  },
-
-  success: {
-    color: "green",
-    fontSize: "13px",
-    marginTop: "10px",
-  },
-};
 
 export default FileUpload;

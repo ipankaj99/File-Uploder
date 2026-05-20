@@ -1,36 +1,56 @@
 import React, { useState } from "react";
 import { useDropzone } from "react-dropzone";
 import axios from "axios";
+import toast from "react-hot-toast";
+import { endpoints } from "../api";
+import UploadProgressPanel from "./UploadProgressPanel";
 
 export default function DropZone() {
   const [file, setFile] = useState(null);
-  const [error, setError] = useState(null);
+  const [dropError, setDropError] = useState(null);
+  const [uploadError, setUploadError] = useState("");
   const [response, setResponse] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: (acceptedFiles, fileRejections) => {
-      setError(null);
+      setDropError(null);
+      setUploadError("");
 
       if (acceptedFiles && acceptedFiles.length > 0) {
         const selectedFile = acceptedFiles[0];
-        const url = URL.createObjectURL(selectedFile);
-
-        setFile({
-          file: selectedFile,
-          url,
+        setFile((prev) => {
+          if (prev?.url) URL.revokeObjectURL(prev.url);
+          return {
+            file: selectedFile,
+            url: URL.createObjectURL(selectedFile),
+          };
         });
       }
 
       if (fileRejections && fileRejections.length > 0) {
         const rejected = fileRejections[0];
         const message = rejected.errors[0]?.message;
-
-        setError(`${rejected.file.name} → ${message}`);
+        setDropError(`${rejected.file.name} — ${message}`);
       }
     },
     multiple: false,
     accept: { "image/*": [] },
+    disabled: isUploading,
   });
+
+  const clearSelection = () => {
+    setFile((prev) => {
+      if (prev?.url) URL.revokeObjectURL(prev.url);
+      return null;
+    });
+    setDropError(null);
+    setUploadError("");
+    setResponse(null);
+    setUploadProgress(0);
+    setIsUploading(false);
+  };
 
   const previewImage = () => {
     if (file?.url) {
@@ -42,152 +62,119 @@ export default function DropZone() {
     try {
       if (!file) return;
 
+      setUploadError("");
+      setIsUploading(true);
+      setUploadProgress(0);
+
       const formData = new FormData();
       formData.append("file", file.file);
 
-      await axios.post("https://file-uploder-64w8.onrender.com/upload", formData);
+      await axios.post(endpoints.upload, formData, {
+        onUploadProgress: (progressEvent) => {
+          const total = progressEvent.total || 1;
+          const percent = Math.round((progressEvent.loaded * 100) / total);
+          setUploadProgress(percent);
+        },
+      });
 
+      if (file?.url) URL.revokeObjectURL(file.url);
       setFile(null);
-      setError(null);
-      setResponse("Upload successful ✅");
-    } catch (err) {
-      setError("Upload failed ❌");
+      setDropError(null);
+      setResponse("Image uploaded successfully.");
+      setUploadProgress(100);
+      toast.success("Image uploaded");
+    } catch {
+      setUploadError("Upload failed. You can retry or remove the file.");
+      setUploadProgress(0);
+      toast.error("Image upload failed");
+    } finally {
+      setIsUploading(false);
     }
   };
 
+  const showPreview = file && !isUploading;
+  const canRetry = Boolean(uploadError && file && !isUploading);
+
   return (
-    <div style={styles.container}>
-      {/* TITLE */}
-      <h2 style={styles.title}>📤 Upload Image</h2>
+    <div className="uploader">
+      <p className="helper-text">
+        Drag and drop one image, then click upload.
+      </p>
 
-      {/* DROPZONE */}
-      <div
-        {...getRootProps()}
-        style={{
-          ...styles.dropBox,
-          background: isDragActive ? "#e6f7ff" : "#fafafa",
-          borderColor: isDragActive ? "#1890ff" : "#ccc",
-        }}
-      >
-        <input {...getInputProps()} />
-
-        {isDragActive ? (
-          <p style={styles.text}>📂 Drop image here...</p>
-        ) : (
-          <p style={styles.text}>
-            Drag & drop image here, or click to select
-          </p>
-        )}
-      </div>
-
-      {/* ERROR */}
-      {error && <p style={styles.error}>{error}</p>}
-
-      {/* SUCCESS */}
-      {response && <p style={styles.success}>{response}</p>}
-
-      {/* PREVIEW */}
-      {file && (
-        <div style={styles.previewCard}>
-          <p style={styles.fileName}>📄 {file.file.name}</p>
-
-          <button style={styles.previewBtn} onClick={previewImage}>
-            👁 Preview
-          </button>
+      {!isUploading && !file && (
+        <div
+          {...getRootProps()}
+          className={`dropzone ${isDragActive ? "dropzone--active" : ""}`}
+        >
+          <input {...getInputProps()} />
+          {isDragActive ? (
+            <p className="muted">Drop image here...</p>
+          ) : (
+            <p className="muted">
+              Drag & drop image here, or click to select
+            </p>
+          )}
         </div>
       )}
 
-      {/* UPLOAD */}
-      <button
-        style={{
-          ...styles.uploadBtn,
-          opacity: file ? 1 : 0.5,
-          cursor: file ? "pointer" : "not-allowed",
-        }}
-        onClick={submitFile}
-        disabled={!file}
-      >
-        ⬆ Upload
-      </button>
+      {isUploading && (
+        <UploadProgressPanel
+          percent={uploadProgress}
+          label={`Uploading ${file?.file?.name || "image"}...`}
+        />
+      )}
+
+      {showPreview && (
+        <div className="preview-block">
+          <img
+            className="preview-single"
+            src={file.url}
+            alt={file.file.name}
+          />
+          <div className="btn-row">
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={previewImage}
+            >
+              Open
+            </button>
+            <button
+              type="button"
+              className="btn btn--danger"
+              onClick={clearSelection}
+            >
+              Remove
+            </button>
+          </div>
+        </div>
+      )}
+
+      {dropError && <p className="alert alert--error">{dropError}</p>}
+      {uploadError && <p className="alert alert--error">{uploadError}</p>}
+      {response && !isUploading && (
+        <p className="alert alert--success">{response}</p>
+      )}
+
+      <div className="btn-row btn-row--wrap">
+        <button
+          type="button"
+          className="btn btn--primary"
+          onClick={submitFile}
+          disabled={!file || isUploading}
+        >
+          {isUploading ? "Uploading..." : "Upload"}
+        </button>
+        {canRetry && (
+          <button
+            type="button"
+            className="btn btn--ghost"
+            onClick={submitFile}
+          >
+            Retry
+          </button>
+        )}
+      </div>
     </div>
   );
 }
-
-/* ---------------- UI STYLES ---------------- */
-const styles = {
-  container: {
-    width: "420px",
-    margin: "60px auto",
-    fontFamily: "Arial",
-    background: "#fff",
-    padding: "25px",
-    borderRadius: "12px",
-    boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
-  },
-
-  title: {
-    textAlign: "center",
-    marginBottom: "20px",
-  },
-
-  dropBox: {
-    border: "2px dashed #ccc",
-    padding: "45px",
-    borderRadius: "12px",
-    textAlign: "center",
-    transition: "0.3s",
-    cursor: "pointer",
-  },
-
-  text: {
-    margin: 0,
-    color: "#666",
-  },
-
-  error: {
-    color: "#e74c3c",
-    marginTop: "10px",
-    fontSize: "14px",
-  },
-
-  success: {
-    color: "#2ecc71",
-    marginTop: "10px",
-    fontSize: "14px",
-  },
-
-  previewCard: {
-    marginTop: "15px",
-    padding: "12px",
-    borderRadius: "10px",
-    background: "#f9f9f9",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-
-  fileName: {
-    fontSize: "14px",
-    margin: 0,
-  },
-
-  previewBtn: {
-    padding: "6px 12px",
-    border: "none",
-    borderRadius: "6px",
-    background: "#000",
-    color: "#fff",
-    cursor: "pointer",
-  },
-
-  uploadBtn: {
-    marginTop: "15px",
-    width: "100%",
-    padding: "12px",
-    border: "none",
-    borderRadius: "8px",
-    background: "#1890ff",
-    color: "#fff",
-    fontWeight: "bold",
-  },
-};
