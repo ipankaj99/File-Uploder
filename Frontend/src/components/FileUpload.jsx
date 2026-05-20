@@ -57,7 +57,7 @@ function FileUpload() {
       formData.append("file", file);
 
       const res = await axios.post(
-        "http://localhost:5000/upload",
+        "https://file-uploader-64w8.onrender.com/upload",
         formData
       );
 

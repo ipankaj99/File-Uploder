@@ -71,7 +71,7 @@ function FileUploadM() {
       });
 
       const res = await axios.post(
-        "http://localhost:5000/uploadMultiple",
+        "https://file-uploader-64w8.onrender.com/uploadMultiple",
         formData,
         {
           headers: {

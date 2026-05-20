@@ -45,7 +45,7 @@ export default function DropZone() {
       const formData = new FormData();
       formData.append("file", file.file);
 
-      await axios.post("http://localhost:5000/upload", formData);
+      await axios.post("https://file-uploader-64w8.onrender.com/upload", formData);
 
       setFile(null);
       setError(null);

@@ -57,7 +57,7 @@ export default function DropZoneM() {
         formData.append("file", f.file);
       });
 
-      await axios.post("http://localhost:5000/uploadMultiple", formData);
+      await axios.post("https://file-uploader-64w8.onrender.com/uploadMultiple", formData);
 
       setFile([]);
       setError([]);
