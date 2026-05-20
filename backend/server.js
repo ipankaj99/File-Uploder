@@ -9,7 +9,8 @@ const app=express();
 
 app.use(cors(
   {
-    origin:'*'
+ origin: "https://file-uploder-zeta.vercel.app", 
+  credentials: true
   }
 ));
 
